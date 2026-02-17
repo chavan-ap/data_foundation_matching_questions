@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ServiceNow CMDB Practice</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0f14;
+    --surface: #161922;
+    --surface2: #1e2230;
+    --border: #2a3045;
+    --accent: #00d4aa;
+    --accent2: #4f8fff;
+    --wrong: #ff4d6d;
+    --text: #e8ecf4;
+    --muted: #6b7a99;
+    --success-bg: #00d4aa18;
+    --wrong-bg: #ff4d6d18;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px),
+                      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.3;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper { position: relative; z-index: 1; max-width: 960px; margin: 0 auto; padding: 24px 20px 80px; }
+
+  /* Header */
+  .header { text-align: center; padding: 48px 0 36px; }
+  .header .tag {
+    display: inline-block;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 4px 14px;
+    border-radius: 2px;
+    margin-bottom: 20px;
+    text-transform: uppercase;
+  }
+  .header h1 {
+    font-family: 'Space Mono', monospace;
+    font-size: clamp(24px, 5vw, 40px);
+    font-weight: 700;
+    line-height: 1.15;
+    color: var(--text);
+  }
+  .header h1 span { color: var(--accent); }
+  .header p { margin-top: 12px; color: var(--muted); font-size: 15px; }
+
+  /* Score bar */
+  .scorebar {
+    display: flex; gap: 16px; justify-content: center;
+    margin-bottom: 32px; flex-wrap: wrap;
+  }
+  .score-pill {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 8px 20px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .score-pill .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .dot-green { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  .dot-red { background: var(--wrong); box-shadow: 0 0 8px var(--wrong); }
+  .dot-blue { background: var(--accent2); box-shadow: 0 0 8px var(--accent2); }
+
+  /* Quiz set nav */
+  .set-nav {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    justify-content: center; margin-bottom: 32px;
+  }
+  .set-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    padding: 7px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all .2s;
+    letter-spacing: .5px;
+  }
+  .set-btn:hover { border-color: var(--accent2); color: var(--text); }
+  .set-btn.active { background: var(--accent2); border-color: var(--accent2); color: #fff; }
+
+  /* Question card */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 24px;
+    animation: fadeUp .3s ease;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .card-header {
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .card-header h2 {
+    font-size: 14px; font-weight: 600;
+    color: var(--accent2);
+    font-family: 'Space Mono', monospace;
+    letter-spacing: .5px;
+  }
+  .card-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  /* Matching layout */
+  .match-container { padding: 24px; }
+  .match-row {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .term {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    min-height: 48px;
+    display: flex; align-items: center;
+  }
+
+  .connector { color: var(--border); font-size: 20px; text-align: center; }
+
+  .answer-slot {
+    background: var(--bg);
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    min-height: 48px;
+    display: flex; align-items: center;
+    font-size: 13px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all .2s;
+    position: relative;
+  }
+  .answer-slot:hover { border-color: var(--accent2); color: var(--text); }
+  .answer-slot.filled { border-style: solid; border-color: var(--border); color: var(--text); background: var(--surface2); }
+  .answer-slot.correct { border-color: var(--accent); background: var(--success-bg); color: var(--accent); }
+  .answer-slot.wrong { border-color: var(--wrong); background: var(--wrong-bg); color: var(--wrong); }
+
+  /* Options pool */
+  .options-pool {
+    border-top: 1px solid var(--border);
+    padding: 20px 24px;
+    background: var(--bg);
+  }
+  .options-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+  }
+  .options-grid {
+    display: flex; flex-wrap: wrap; gap: 8px;
+  }
+  .option-chip {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 13px;
+    color: var(--text);
+    cursor: pointer;
+    transition: all .2s;
+    user-select: none;
+  }
+  .option-chip:hover { border-color: var(--accent2); background: var(--surface2); }
+  .option-chip.selected { border-color: var(--accent2); background: rgba(79,143,255,.15); color: var(--accent2); }
+  .option-chip.used { opacity: 0.35; pointer-events: none; }
+
+  /* Card footer */
+  .card-footer {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    display: flex; justify-content: flex-end; gap: 10px;
+  }
+  .btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    padding: 9px 22px;
+    border-radius: 6px;
+    border: 1px solid;
+    cursor: pointer;
+    transition: all .2s;
+    letter-spacing: .5px;
+  }
+  .btn-check {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #000;
+    font-weight: 700;
+  }
+  .btn-check:hover { filter: brightness(1.1); transform: translateY(-1px); }
+  .btn-reset {
+    background: transparent;
+    border-color: var(--border);
+    color: var(--muted);
+  }
+  .btn-reset:hover { border-color: var(--wrong); color: var(--wrong); }
+
+  .result-msg {
+    padding: 10px 24px 14px;
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    text-align: center;
+    display: none;
+  }
+  .result-msg.show { display: block; }
+  .result-msg.perfect { color: var(--accent); }
+  .result-msg.partial { color: #fbbf24; }
+
+  /* Global reset */
+  .global-actions { text-align: center; margin-top: 40px; }
+  .btn-global {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    padding: 12px 32px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    transition: all .2s;
+    letter-spacing: .5px;
+  }
+  .btn-global:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    .match-row { grid-template-columns: 1fr; }
+    .connector { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <div class="header">
+    <div class="tag">ServiceNow · CIS-CMDB</div>
+    <h1>Matching<br><span>Practice</span></h1>
+    <p>Click an answer option, then click a slot to place it. Check when done.</p>
+  </div>
+
+  <div class="scorebar">
+    <div class="score-pill"><div class="dot dot-green"></div><span id="s-correct">0 correct</span></div>
+    <div class="score-pill"><div class="dot dot-red"></div><span id="s-wrong">0 wrong</span></div>
+    <div class="score-pill"><div class="dot dot-blue"></div><span id="s-sets">0 / 0 sets done</span></div>
+  </div>
+
+  <div class="set-nav" id="setNav"></div>
+
+  <div id="quizContainer"></div>
+
+  <div class="global-actions">
+    <button class="btn-global" onclick="resetAll()">↺ Reset All Progress</button>
+  </div>
+
+</div>
+
+<script>
+const SETS = [
+  {
+    id: 'cmdb-metrics-1',
+    title: 'CMDB Health Metrics',
+    subtitle: 'Match metric to definition',
+    pairs: [
+      { term: 'Duplicate', def: 'Records that represent the same physical or logical asset multiple times' },
+      { term: 'Required', def: 'Fields necessary to create or update a CI record in the CMDB' },
+      { term: 'Orphan', def: 'Records that no longer maintain their logical or physical relationships with other CIs' },
+      { term: 'Stale', def: 'Records that are no longer actively updated, but remain stored in the database' },
+      { term: 'Recommended', def: 'Fields that support the accuracy, completeness, and usability of CI records in the CMDB' },
+      { term: 'Audit', def: 'Actual values of specified fields are compared to the expected values defined in a template' },
+    ]
+  },
+  {
+    id: 'design-arch',
+    title: 'Design Architecture → Management Tool',
+    subtitle: 'Match architecture design to its CMDB tool',
+    pairs: [
+      { term: 'Automated agent-based solution running patterns', def: 'Agent Client Collector' },
+      { term: 'Organization-built solution using transform maps', def: 'Import Sets' },
+      { term: 'Third-party integrations from other vendors', def: 'Service Graph Connector' },
+      { term: 'Automated agentless solution running patterns', def: 'ServiceNow Discovery' },
+    ]
+  },
+  {
+    id: 'dedup-tools',
+    title: 'Duplicate CI Tools',
+    subtitle: 'Match each tool to its outcome',
+    pairs: [
+      { term: 'De-Duplication Tasks', def: 'Can be assigned to groups for resolving duplicate CIs' },
+      { term: 'CMDB Health Dashboard Correctness Scorecard', def: 'Offers insight into duplicate CIs within the CMDB' },
+      { term: 'De-Duplication Templates', def: 'Offers a solution to resolve de-duplication tasks in bulk' },
+      { term: 'Duplicate CI Remediator', def: 'Provides a wizard to resolve de-duplication tasks individually' },
+    ]
+  },
+  {
+    id: 'service-types',
+    title: 'Service Types',
+    subtitle: 'Match service type to its definition',
+    pairs: [
+      { term: 'Application Service', def: 'Logical representation of a deployed system or application stack' },
+      { term: 'Technology Management Service', def: 'Published to Service Owners and underpins one or more business or application Services' },
+      { term: 'Business Service', def: 'Published to Business Users and underpins one or more business capabilities' },
+    ]
+  },
+  {
+    id: 'app-service-types',
+    title: 'Application Service Types',
+    subtitle: 'Match each type to its best description',
+    pairs: [
+      { term: 'Service Mapping (Top-down)', def: 'Recommended for mission-critical applications; requires a precise approach using patterns' },
+      { term: 'Service Mapping (Connection Suggestion)', def: 'Best fit to map cloud-native, container-based, or machine environments' },
+      { term: 'Tag-Based', def: 'Ideal for custom-built applications; leverages fingerprinting to generate service maps' },
+      { term: 'Dynamic CI Group', def: 'Ideal for small application services that can be easily defined using filters and CMDB queries' },
+    ]
+  },
+  {
+    id: 'csdm-domains',
+    title: 'CMDB Objects → CSDM Domains',
+    subtitle: 'Assign each CI object to its CSDM domain',
+    pairs: [
+      { term: 'Business Application', def: 'Design and Planning domain' },
+      { term: 'Business Process', def: 'Foundation domain' },
+      { term: 'Application Service', def: 'Service Delivery domain' },
+      { term: 'Business Service', def: 'Sell / Consume domain' },
+    ]
+  },
+  {
+    id: 'incident-products',
+    title: 'ServiceNow Products → Incident Management',
+    subtitle: 'Match each product to the value it brings',
+    pairs: [
+      { term: 'Hardware Asset Management', def: 'Delivers asset actions and events for the management and maintenance of assets during incidents' },
+      { term: 'Risk Management', def: 'Supplies critical IT and financial risk data, enabling the team to assess the broader impact of incidents on business operations' },
+      { term: 'Discovery', def: 'Offers detailed operational-level data on hardware and application CIs to improve incident resolution' },
+      { term: 'Service Portfolio Management', def: 'Provides life cycle information about services, helping to align incidents with the status and history of services' },
+    ]
+  },
+  {
+    id: 'cmdb-metrics-2',
+    title: 'CMDB Health Dashboard (KPI sub-metrics)',
+    subtitle: 'Match the metric to its description',
+    pairs: [
+      { term: 'Audits', def: 'Use these to compare actual values with expected values' },
+      { term: 'Orphan CIs', def: 'Use of these should be minimized' },
+      { term: 'Required fields', def: 'Certain attribute values are not set, or relationships are missing' },
+      { term: 'Recommended fields', def: 'Preferable for them to be populated, as they could be useful in troubleshooting issues' },
+      { term: 'Stale CIs', def: 'Have not been updated and may be outdated' },
+      { term: 'Duplicate CIs', def: 'Detected during identification and reconciliation; have associated base system remediation tools' },
+    ]
+  },
+  {
+    id: 'lifecycle-objects',
+    title: 'Life Cycle Objects/Attributes',
+    subtitle: 'Match each object to its description',
+    pairs: [
+      { term: 'life_cycle_mapping', def: 'Pre-populated with mappings for legacy status values to the best-fit CSDM life-cycle value pair' },
+      { term: 'life_cycle_stage', def: 'A record attribute that reflects a meta-level state of the record life cycle' },
+      { term: 'life_cycle_stage_status', def: 'A record attribute that reflects a sub-level state of the record life cycle' },
+      { term: 'life_cycle_object', def: 'Uses the type of CI to determine which sub-level life cycle state values are available' },
+    ]
+  },
+  {
+    id: 'cmdb-roles',
+    title: 'CMDB Roles',
+    subtitle: 'Match each role to its job description',
+    pairs: [
+      { term: 'CI Analyst', def: 'Has read-only access to CMDB data and to basic user interface such as CMDB reports and dashboards' },
+      { term: 'Service or Product Owner', def: 'Accountable for managing all elements that make up a portfolio throughout their entire lifecycle' },
+      { term: 'Configuration Manager / CMDB Admin', def: 'Manages assigned CI tables and keeps records updated and resolves tasks related to CMDB records' },
+      { term: 'CMDB Process Owner', def: 'Obtains highest level role for CMDB privileges' },
+    ]
+  },
+  {
+    id: 'cmdb360-props',
+    title: 'CMDB 360 System Properties',
+    subtitle: 'Match the functionality to the system property',
+    pairs: [
+      { term: 'Enables CMDB 360', def: 'glide.identification_engine.multisource_enabled' },
+      { term: 'Enables capturing CMDB 360 data for CIs from non-CMDB classes', def: 'glide.identification_engine.multisource_cmdb_ci_enabled' },
+      { term: 'Enables logging for CMDB 360', def: 'glide.cmdb.logger.source.cmdb_multisource' },
+      { term: 'Maximum number of CIs in a CMDB 360 recompute operation', def: 'glide.identification_engine.multisource.recompute.max.ci.limit' },
+    ]
+  },
+  {
+    id: 'products-desc',
+    title: 'CMDB Management Products',
+    subtitle: 'Match each product to its description',
+    pairs: [
+      { term: 'ServiceNow Discovery', def: 'Automatically identifies devices and applications in the network, populating the CMDB with accurate and up-to-date information' },
+      { term: 'Service Graph Connectors', def: 'Facilitates integration between ServiceNow and external systems to import and synchronize data' },
+      { term: 'Service Mapping', def: 'Complete topology of the services and shows how they are supported by underlying infrastructure and applications' },
+      { term: 'Agent Client Collector (ACC)', def: 'Provides real-time visibility into endpoint configurations, populating the CMDB with accurate and up-to-date information' },
+    ]
+  },
+  {
+    id: 'csdm-governance',
+    title: 'CSDM Governance Domains → Roles',
+    subtitle: 'Match each domain to its governance team roles',
+    pairs: [
+      { term: 'Foundation Domain', def: 'Service Owner(s), Platform Owner' },
+      { term: 'Portfolio Domain', def: 'Technology Service Owner(s), Application Service Owner(s), Platform Owner' },
+      { term: 'Design Domain', def: 'Enterprise Architect(s), Platform Owner' },
+      { term: 'Technical Domain', def: 'Enterprise Architect(s), Data Steward(s), Process Owner(s), Platform Owner' },
+    ]
+  },
+  {
+    id: 'csdm-benefits',
+    title: 'CSDM Domain Benefits',
+    subtitle: 'Match each domain to its business benefit',
+    pairs: [
+      { term: 'Design and Planning', def: 'Understand CIs related to business applications; identify redundancies, monitor costs and make better investment decisions around roadmap' },
+      { term: 'Service Delivery', def: 'Understand technical services, technical service offerings, service support and all relationships to underlying technology CIs' },
+      { term: 'Service Consumption', def: 'Understand business services and ownership, cost, scope of what is offered to the business/consumer and request access to the business services' },
+      { term: 'Foundation', def: 'Use the base system tables when implementing the CSDM to derive the highest value from ServiceNow products and the Now Platform' },
+    ]
+  },
+  {
+    id: 'kpi-submetrics',
+    title: 'CMDB Health KPI Sub-metrics',
+    subtitle: 'Match the sub-metric to the correct KPI',
+    pairs: [
+      { term: 'Required', def: 'Completeness' },
+      { term: 'Audit', def: 'Compliance' },
+      { term: 'Orphan', def: 'Correctness' },
+    ]
+  },
+];
+
+// State
+let state = {}; // setId -> { slots: {termIndex: def|null}, selected: null, checked: bool }
+let totalCorrect = 0;
+let totalWrong = 0;
+let setsDone = 0;
+
+function initState(set) {
+  if (!state[set.id]) {
+    state[set.id] = {
+      slots: Object.fromEntries(set.pairs.map((_, i) => [i, null])),
+      selected: null,
+      checked: false
+    };
+  }
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Shuffled options per set (stable across re-renders)
+const shuffledOptions = {};
+function getShuffled(set) {
+  if (!shuffledOptions[set.id]) {
+    shuffledOptions[set.id] = shuffle(set.pairs.map(p => p.def));
+  }
+  return shuffledOptions[set.id];
+}
+
+function renderAll() {
+  const container = document.getElementById('quizContainer');
+  container.innerHTML = '';
+  SETS.forEach((set, si) => {
+    initState(set);
+    container.appendChild(renderSet(set, si));
+  });
+  updateScorebar();
+  renderNav();
+}
+
+function renderSet(set, si) {
+  const s = state[set.id];
+  const opts = getShuffled(set);
+  const usedDefs = Object.values(s.slots).filter(Boolean);
+
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.id = 'card-' + set.id;
+
+  // Header
+  card.innerHTML = `
+    <div class="card-header">
+      <h2>${set.title}</h2>
+      <span class="card-badge">${set.subtitle}</span>
+    </div>
+  `;
+
+  // Match rows
+  const matchDiv = document.createElement('div');
+  matchDiv.className = 'match-container';
+
+  set.pairs.forEach((pair, i) => {
+    const slotVal = s.slots[i];
+    let slotClass = 'answer-slot';
+    if (slotVal) slotClass += ' filled';
+    if (s.checked && slotVal) {
+      slotClass += slotVal === pair.def ? ' correct' : ' wrong';
+    }
+    const slotText = slotVal
+      ? (s.checked && slotVal !== pair.def ? `✗ ${slotVal}` : (s.checked ? `✓ ${slotVal}` : slotVal))
+      : 'Click to place answer…';
+
+    const row = document.createElement('div');
+    row.className = 'match-row';
+    row.innerHTML = `
+      <div class="term">${pair.term}</div>
+      <div class="connector">→</div>
+      <div class="${slotClass}" data-set="${set.id}" data-idx="${i}">${slotText}</div>
+    `;
+    matchDiv.appendChild(row);
+  });
+  card.appendChild(matchDiv);
+
+  // Options pool
+  const pool = document.createElement('div');
+  pool.className = 'options-pool';
+  pool.innerHTML = `<div class="options-label">OPTIONS</div>`;
+  const grid = document.createElement('div');
+  grid.className = 'options-grid';
+
+  opts.forEach(def => {
+    const chip = document.createElement('div');
+    chip.className = 'option-chip';
+    const isUsed = usedDefs.includes(def);
+    const isSel = s.selected === def;
+    if (isUsed) chip.classList.add('used');
+    if (isSel) chip.classList.add('selected');
+    if (s.checked) chip.classList.add('used'); // disable after check
+    chip.textContent = def;
+    chip.dataset.def = def;
+    chip.dataset.set = set.id;
+    if (!isUsed && !s.checked) {
+      chip.onclick = () => selectOption(set.id, def);
+    }
+    grid.appendChild(chip);
+  });
+  pool.appendChild(grid);
+  card.appendChild(pool);
+
+  // Result msg
+  if (s.checked) {
+    const correct = set.pairs.filter((p, i) => s.slots[i] === p.def).length;
+    const msg = document.createElement('div');
+    msg.className = `result-msg show ${correct === set.pairs.length ? 'perfect' : 'partial'}`;
+    msg.textContent = correct === set.pairs.length
+      ? `★ Perfect! All ${correct}/${set.pairs.length} correct`
+      : `${correct}/${set.pairs.length} correct — review the highlighted answers`;
+    card.appendChild(msg);
+  }
+
+  // Footer
+  const footer = document.createElement('div');
+  footer.className = 'card-footer';
+  if (!s.checked) {
+    const filled = Object.values(s.slots).filter(Boolean).length;
+    footer.innerHTML = `
+      <button class="btn btn-reset" onclick="resetSet('${set.id}')">Reset</button>
+      <button class="btn btn-check" onclick="checkSet('${set.id}')" ${filled < set.pairs.length ? 'disabled style="opacity:.5;cursor:not-allowed"' : ''}>Check Answers</button>
+    `;
+  } else {
+    footer.innerHTML = `<button class="btn btn-reset" onclick="resetSet('${set.id}')">Try Again</button>`;
+  }
+  card.appendChild(footer);
+
+  // Slot click listeners
+  card.querySelectorAll('.answer-slot').forEach(slot => {
+    slot.onclick = () => placeAnswer(slot.dataset.set, parseInt(slot.dataset.idx));
+  });
+
+  return card;
+}
+
+function selectOption(setId, def) {
+  const s = state[setId];
+  if (s.checked) return;
+  s.selected = s.selected === def ? null : def;
+  refreshSet(setId);
+}
+
+function placeAnswer(setId, idx) {
+  const s = state[setId];
+  if (s.checked) return;
+
+  if (s.selected) {
+    // If slot already has value, return it to pool first
+    const existing = s.slots[idx];
+    s.slots[idx] = s.selected;
+    s.selected = existing; // deselect or re-hold existing
+    if (!existing) s.selected = null;
+  } else if (s.slots[idx]) {
+    // Remove from slot
+    s.selected = s.slots[idx];
+    s.slots[idx] = null;
+  }
+  refreshSet(setId);
+}
+
+function checkSet(setId) {
+  const set = SETS.find(s => s.id === setId);
+  const s = state[setId];
+  s.checked = true;
+  s.selected = null;
+
+  const correct = set.pairs.filter((p, i) => s.slots[i] === p.def).length;
+  totalCorrect += correct;
+  totalWrong += (set.pairs.length - correct);
+  setsDone++;
+
+  refreshSet(setId);
+  updateScorebar();
+}
+
+function resetSet(setId) {
+  const set = SETS.find(s => s.id === setId);
+  if (state[setId].checked) {
+    const correct = set.pairs.filter((p, i) => state[setId].slots[i] === p.def).length;
+    totalCorrect -= correct;
+    totalWrong -= (set.pairs.length - correct);
+    setsDone--;
+  }
+  state[setId] = {
+    slots: Object.fromEntries(set.pairs.map((_, i) => [i, null])),
+    selected: null,
+    checked: false
+  };
+  delete shuffledOptions[setId];
+  refreshSet(setId);
+  updateScorebar();
+}
+
+function refreshSet(setId) {
+  const set = SETS.find(s => s.id === setId);
+  const si = SETS.indexOf(set);
+  const old = document.getElementById('card-' + setId);
+  const newCard = renderSet(set, si);
+  old.replaceWith(newCard);
+}
+
+function updateScorebar() {
+  document.getElementById('s-correct').textContent = `${totalCorrect} correct`;
+  document.getElementById('s-wrong').textContent = `${totalWrong} wrong`;
+  document.getElementById('s-sets').textContent = `${setsDone} / ${SETS.length} sets done`;
+}
+
+function renderNav() {
+  const nav = document.getElementById('setNav');
+  nav.innerHTML = '';
+  SETS.forEach(set => {
+    const btn = document.createElement('button');
+    btn.className = 'set-btn';
+    btn.textContent = set.title;
+    btn.onclick = () => {
+      document.getElementById('card-' + set.id).scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    nav.appendChild(btn);
+  });
+}
+
+function resetAll() {
+  totalCorrect = 0; totalWrong = 0; setsDone = 0;
+  state = {};
+  Object.keys(shuffledOptions).forEach(k => delete shuffledOptions[k]);
+  renderAll();
+}
+
+// Init
+renderAll();
+</script>
+</body>
+</html>
